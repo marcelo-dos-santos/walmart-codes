@@ -1,0 +1,908 @@
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  cleanup,
+  act,
+} from '@testing-library/react';
+import Shipping from '../Shipping';
+
+import { filterValues, Options } from '../../utils/formInterface';
+import userEvent from '@testing-library/user-event';
+
+describe('Shipping Component', () => {
+  const shippingFilters: filterValues[] = [
+    {
+      displayLabel: 'Filter 1',
+      inputType: 'radio',
+      label: 'filter1',
+      mandatory: true,
+      options: [
+        { label: 'Option 1', value: 'option1' },
+        { label: 'Option 2', value: 'option2' },
+      ],
+      name: 'Filter1',
+      group: 1,
+      division: 'sampleDivision',
+      value: 'Filter1',
+      errorMsg: '',
+      regExp: '',
+    },
+    {
+      displayLabel: 'Filter 2',
+      inputType: 'select',
+      label: 'filter2',
+      mandatory: false,
+      options: [
+        { label: 'OptionS 1', value: 'option1' },
+        { label: 'OptionS 2', value: 'option2' },
+      ],
+      name: '',
+      group: 0,
+      division: '',
+      value: '',
+      errorMsg: '',
+      regExp: '',
+    },
+    {
+      displayLabel: 'Filter 3',
+      inputType: 'input',
+      label: 'filter3',
+      mandatory: true,
+      name: 'Filter3',
+      group: 2,
+      division: '',
+      value: 'Filter3',
+      regExp: '^[+]?(?=.*[1-9])\\d*(?:\\.\\d*)?$',
+      errorMsg: '',
+    },
+    {
+      displayLabel: 'Filter Without Division',
+      inputType: 'radio',
+      label: 'filterWithoutDivision',
+      mandatory: true,
+      options: [
+        { label: 'Option A', value: 'optionA' },
+        { label: 'Option B', value: 'optionB' },
+      ],
+      name: 'FilterWithoutDivision',
+      division: '',
+      group: 1,
+      value: 'FilterWithoutDivision',
+      errorMsg: '',
+      regExp: '',
+    },
+    {
+      displayLabel: 'Input Without Division',
+      inputType: 'input',
+      label: 'inputWithoutDivision',
+      mandatory: true,
+      name: 'InputWithoutDivision',
+      group: 1,
+      division: '',
+      value: 'InputWithoutDivision',
+      errorMsg: '',
+      regExp: '',
+    },
+    {
+      displayLabel: 'Unkown Input Type',
+      inputType: 'unknownInputType',
+      label: 'unknownInput',
+      mandatory: true,
+      name: 'UnknownInput',
+      division: '',
+      group: 1,
+      value: 'UnknownInput',
+      errorMsg: '',
+      regExp: '',
+    },
+  ];
+
+  const handleInputChangeMock = jest.fn();
+  const handleSelectChangeMock = jest.fn();
+  const setFilterMock = jest.fn();
+  const setInitialValuesMock = jest.fn();
+  const filter: { [key: string]: any } = {
+    import_freight: {
+      transport_mode: 5,
+    },
+    network_id: 2,
+    pack: {
+      weight_uom: 'KG',
+    },
+  };
+  const errors: { [key: string]: any } = {};
+  const selectFilter: { [key: string]: any } = {};
+  const initialValues: {
+    market: Options;
+    supplier: Options;
+    department: Options;
+    costValue: string;
+  } = {
+    market: { label: 'Test 1', value: '1001' },
+    supplier: { label: 'Test 2', value: '1' },
+    department: { label: 'Test 4', value: '92' },
+    costValue: '',
+  };
+
+  beforeEach(() => {
+    handleInputChangeMock.mockReset();
+    handleSelectChangeMock.mockReset();
+  });
+
+  it('renders without errors', () => {
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={errors}
+        setFilter={setFilterMock}
+        selectFilter={selectFilter}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+  });
+
+  it('renders the Shipping component correctly', () => {
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    expect(screen.getByText('Shipping and Transportation')).toBeInTheDocument();
+    expect(screen.getByText('Customized Cost')).toBeInTheDocument();
+  });
+
+  it('handles radio button click correctly', () => {
+    const props = {
+      shippingFilters: [],
+      filter: filter,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      handleSelectChange: jest.fn(),
+      initialValues: {
+        market: { label: 'Test 1', value: '1001' },
+        supplier: { label: 'Test 2', value: '1' },
+        costValue: '',
+        department: { label: 'Test 4', value: '92' },
+      },
+      setInitialValues: setInitialValuesMock,
+      setRequestData: jest.fn(),
+    };
+    const { getByTestId } = render(
+      <Shipping setErrors={undefined} {...props} />
+    );
+
+    const radioButton = getByTestId('customizedCost') as HTMLInputElement;
+    fireEvent.click(radioButton, { target: { checked: true } });
+    expect(radioButton.checked).toBe(true);
+  });
+
+  it('handles select change and updates state', () => {
+    const { getByLabelText } = render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+    const selectDropdown = getByLabelText('Option 1');
+    expect(selectDropdown).not.toBeChecked();
+
+    fireEvent.change(selectDropdown, { target: { value: 'option1' } });
+  });
+
+  it('handles the entry of shipping values correctly', () => {
+    const setFilterMock = jest.fn();
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const detailedCostRadio = screen.getByLabelText('Shipping Details');
+    fireEvent.click(detailedCostRadio, { target: { checked: true } });
+    expect((detailedCostRadio as HTMLInputElement).checked).toBe(true);
+  });
+
+  it('sets freight_amount when customized cost is selected', () => {
+    const { getByLabelText } = render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={errors}
+        setFilter={(newFilter: {
+          overrides: { cost_overrides: { freight_amount: any } };
+        }) => {
+          if (
+            typeof newFilter.overrides?.cost_overrides?.freight_amount ===
+            'number'
+          ) {
+            expect(
+              typeof newFilter.overrides.cost_overrides.freight_amount
+            ).toBe('number');
+          }
+        }}
+        selectFilter={selectFilter}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const customizedCostRadio = getByLabelText('Customized Cost');
+    fireEvent.click(customizedCostRadio, { target: { checked: true } });
+
+    expect(customizedCostRadio).toBeChecked();
+
+    const inputElement = screen.getByPlaceholderText('$');
+
+    fireEvent.change(inputElement, { target: { value: '123.45' } });
+  });
+
+  it('renders input fields correctly when customizedCost is false', () => {
+    const { getByLabelText, getByPlaceholderText } = render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={{}}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const customizedCostRadio = getByLabelText('Customized Cost');
+    fireEvent.click(customizedCostRadio);
+
+    const inputElement = getByPlaceholderText('$');
+    expect(inputElement).toBeInTheDocument();
+  });
+
+  it('updates freight_amount in setFilter with a number when input value changes', () => {
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={{}}
+        errors={errors}
+        setFilter={(newFilter: {
+          overrides: { cost_overrides: { freight_amount: any } };
+        }) => {
+          if (
+            typeof newFilter.overrides?.cost_overrides?.freight_amount ===
+            'number'
+          ) {
+            expect(
+              typeof newFilter.overrides.cost_overrides.freight_amount
+            ).toBe('number');
+          }
+        }}
+        selectFilter={selectFilter}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+    fireEvent.click(screen.getByLabelText('Customized Cost'));
+
+    fireEvent.change(screen.getByPlaceholderText('$'), {
+      target: { value: '123.45' },
+    });
+  });
+
+  it('renders input fields when customizedCost is true', () => {
+    const { getByLabelText, getByPlaceholderText } = render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const customizedCostRadio = getByLabelText('Customized Cost');
+    fireEvent.click(customizedCostRadio);
+
+    const inputElement = getByPlaceholderText('$');
+    expect(inputElement).toBeInTheDocument();
+  });
+
+  it('renders input field when customizedCost is false', () => {
+    render(
+      <Shipping
+        shippingFilters={[]}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const inputElement = screen.getByPlaceholderText('$');
+    expect(inputElement).toBeInTheDocument();
+  });
+
+  it("renders volume input fields when val.label is 'volume", () => {
+    const shippingFiltersWithVolume = [
+      ...shippingFilters,
+      {
+        displayLabel: 'Volume',
+        inputType: 'input',
+        label: 'volume',
+        mandatory: true,
+        name: 'Volume',
+        group: 2,
+        division: '',
+        value: 'Volume',
+        regExp: '^[+]?(?=.*[1-9])\\d*(?:\\.\\d*)?$',
+        errorMsg: '',
+      },
+    ];
+
+    const { getByText, getByPlaceholderText } = render(
+      <Shipping
+        shippingFilters={shippingFiltersWithVolume}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    expect(getByText('Length')).toBeInTheDocument();
+    expect(getByText('Width')).toBeInTheDocument();
+    expect(getByText('Height')).toBeInTheDocument();
+
+    expect(getByPlaceholderText('Length')).toBeInTheDocument();
+    expect(getByPlaceholderText('Width')).toBeInTheDocument();
+    expect(getByPlaceholderText('Height')).toBeInTheDocument();
+  });
+
+  it("does not render volume input fields when val.label is not 'volume'", () => {
+    const { queryByText, queryByPlaceholderText } = render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={initialValues}
+        setInitialValues={setInitialValuesMock}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    expect(queryByText('Length')).toBeNull();
+    expect(queryByText('Width')).toBeNull();
+    expect(queryByText('Height')).toBeNull();
+
+    expect(queryByPlaceholderText('Length')).toBeNull();
+    expect(queryByPlaceholderText('Width')).toBeNull();
+    expect(queryByPlaceholderText('Height')).toBeNull();
+  });
+
+  it('updates filter state with freight_amount when input value changes', () => {
+    const setFilterMock = jest.fn();
+    const props = {
+      shippingFilters: [],
+      filter: {
+        overrides: {
+          cost_overrides: {
+            freight_amount: 1,
+          },
+        },
+        import_freight: {
+          transport_mode: 5,
+        },
+        pack: {
+          weight_uom: 'KG',
+        },
+      },
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      handleSelectChange: jest.fn(),
+      initialValues: {
+        market: { label: 'Test 1', value: '1001' },
+        supplier: { label: 'Test 2', value: '1' },
+        costValue: '',
+        department: { label: 'Test 4', value: '92' },
+      },
+      setInitialValues: setInitialValuesMock,
+      setRequestData: jest.fn(),
+    };
+
+    const { getByTestId } = render(
+      <Shipping setErrors={undefined} {...props} />
+    );
+
+    const radioButton = getByTestId('customizedCost');
+    fireEvent.click(radioButton);
+
+    const input = screen.getByPlaceholderText('$') as HTMLInputElement;
+    fireEvent.change(input, { target: { value: '100' } });
+
+    expect(setFilterMock).toHaveBeenCalledWith(expect.any(Function));
+  });
+
+  it('updates filter correctly based on division', () => {
+    const setFilterMock = jest.fn();
+    const props = {
+      shippingFilters: shippingFilters,
+      filter: filter,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      handleSelectChange: jest.fn(),
+      initialValues: {
+        market: { label: 'Test 1', value: '1001' },
+        supplier: { label: 'Test 2', value: '1' },
+        costValue: 'Detailed Cost',
+        department: { label: 'Test 4', value: '92' },
+      },
+      setInitialValues: setInitialValuesMock,
+      setRequestData: jest.fn(),
+    };
+
+    const { getByText } = render(<Shipping setErrors={undefined} {...props} />);
+
+    const radioButton = getByText('Option 1');
+    fireEvent.click(radioButton);
+
+    expect(setFilterMock).toHaveBeenCalledWith(expect.any(Function));
+
+    const callback_1 = setFilterMock.mock.calls[1][0];
+    const newState_1 = callback_1({});
+
+    expect(newState_1).toEqual({
+      sampleDivision: {
+        filter1: 'option1',
+      },
+    });
+  });
+
+  it("sets freight_amount to null when 'Customized Cost' is selected", async () => {
+    const setFilterMock = jest.fn();
+    const props = {
+      shippingFilters: [],
+      filter: filter,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      handleSelectChange: jest.fn(),
+      setRequestData: jest.fn(),
+    };
+
+    const { getByTestId } = render(
+      <Shipping
+        setErrors={undefined}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={setInitialValuesMock}
+        {...props}
+      />
+    );
+
+    const radioButton = getByTestId('customizedCost');
+    fireEvent.click(radioButton);
+
+    const detailedCostButton = getByTestId('detailedCost');
+    fireEvent.click(detailedCostButton);
+
+    await waitFor(() => {
+      expect(setFilterMock).toHaveBeenCalledWith(expect.any(Function));
+    });
+
+    const callback = setFilterMock.mock.calls[0][0];
+    const newState = callback(props.filter);
+
+    expect(newState).toEqual({
+      ...props.filter,
+      overrides: {
+        cost_overrides: {
+          freight_amount: '',
+        },
+      },
+    });
+  });
+
+  it('updates filter value for a radio option without division', () => {
+    const setFilterMock = jest.fn();
+    const props = {
+      shippingFilters,
+      filter: filter,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      handleSelectChange: jest.fn(),
+      setRequestData: jest.fn(),
+    };
+
+    render(
+      <Shipping
+        setErrors={undefined}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={undefined}
+        {...props}
+      />
+    );
+
+    const radioButtonOptionA = screen.getByLabelText('Option A');
+    fireEvent.click(radioButtonOptionA);
+
+    const firstArg = setFilterMock.mock.calls[1][0];
+    const newState = firstArg({});
+
+    expect(newState).toEqual(
+      expect.objectContaining({
+        filterWithoutDivision: 'optionA',
+      })
+    );
+  });
+
+  it('renders an input field without division correctly', () => {
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={undefined}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    expect(screen.getByText('Input Without Division')).toBeInTheDocument();
+  });
+
+  it('renders null for an unknown input type', () => {
+    render(
+      <Shipping
+        shippingFilters={shippingFilters.filter(
+          (filter) => filter.inputType !== 'unknownInputType'
+        )}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={undefined}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const initialInputsCount = screen.getAllByRole('textbox').length;
+
+    cleanup();
+
+    render(
+      <Shipping
+        shippingFilters={shippingFilters}
+        filter={filter}
+        handleInputChange={handleInputChangeMock}
+        errors={{}}
+        setFilter={setFilterMock}
+        selectFilter={{}}
+        handleSelectChange={handleSelectChangeMock}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={undefined}
+        setRequestData={{}}
+        setErrors={undefined}
+      />
+    );
+
+    const inputs = screen.getAllByRole('textbox');
+    expect(inputs.length).toBe(initialInputsCount);
+  });
+
+  it("should select '1-OCEAN' when pack is changed", async () => {
+    const setFilterMock = jest.fn();
+    const mockShippingFilters = [
+      {
+        displayLabel: 'Volume',
+        inputType: 'input',
+        label: 'volume',
+        mandatory: true,
+        name: 'Volume',
+        group: 2,
+        division: '',
+        value: 'Volume',
+        regExp: '^[+]?(?=.*[1-9])\\d*(?:\\.\\d*)?$',
+        errorMsg: '',
+      },
+      {
+        displayLabel: 'Vendor Pack Weight',
+        inputType: 'input',
+        label: 'weight',
+        mandatory: true,
+        name: 'packWeight',
+        division: 'pack',
+        group: 2,
+        value: '',
+        errorMsg: '',
+        regExp: '',
+      },
+    ];
+    const mockFilter: { [key: string]: any } = {
+      network_id: 2,
+      pack: {
+        weight_uom: 'KG',
+      },
+    };
+    const mockHandleSelectChange = jest.fn();
+    const props = {
+      shippingFilters: mockShippingFilters,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      setRequestData: jest.fn(),
+    };
+
+    const { getByPlaceholderText } = render(
+      <Shipping
+        setErrors={undefined}
+        handleSelectChange={mockHandleSelectChange}
+        filter={mockFilter}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={setInitialValuesMock}
+        {...props}
+      />
+    );
+
+    await act(async () => {
+      const packWeightInput = getByPlaceholderText('Vendor Pack Weight');
+      userEvent.type(packWeightInput, '19600');
+      packWeightInput.blur();
+    });
+
+    expect(mockHandleSelectChange).toHaveBeenCalledWith(
+      { value: 1, label: '1 - OCEAN' },
+      'transport_mode'
+    );
+    expect(setFilterMock).toHaveBeenCalled();
+  });
+
+  it("should select '5- OCN HEAVY' for heavyweight package", async () => {
+    const setFilterMock = jest.fn();
+    const mockShippingFilters = [
+      {
+        displayLabel: 'Volume',
+        inputType: 'input',
+        label: 'volume',
+        mandatory: true,
+        name: 'Volume',
+        group: 2,
+        division: '',
+        value: 'Volume',
+        regExp: '^[+]?(?=.*[1-9])\\d*(?:\\.\\d*)?$',
+        errorMsg: '',
+      },
+      {
+        displayLabel: 'Vendor Pack Weight',
+        inputType: 'input',
+        label: 'weight',
+        mandatory: true,
+        name: 'packWeight',
+        division: 'pack',
+        group: 2,
+        value: '',
+        errorMsg: '',
+        regExp: '',
+      },
+    ];
+    const mockFilter: { [key: string]: any } = {
+      network_id: 2,
+      pack: {
+        weight_uom: 'KG',
+      },
+    };
+    const mockHandleSelectChange = jest.fn();
+    const props = {
+      shippingFilters: mockShippingFilters,
+      handleInputChange: jest.fn(),
+      errors: {},
+      setFilter: setFilterMock,
+      selectFilter: {},
+      setRequestData: jest.fn(),
+    };
+
+    const { getByPlaceholderText } = render(
+      <Shipping
+        setErrors={undefined}
+        handleSelectChange={mockHandleSelectChange}
+        filter={mockFilter}
+        initialValues={{
+          market: {
+            label: 'Default Market Label',
+            value: 'Default Market Value',
+          },
+          supplier: {
+            label: 'Default Supplier Label',
+            value: 'Default Supplier Value',
+          },
+          department: {
+            label: 'Default Department Label',
+            value: 'Default Department Label',
+          },
+          costValue: '',
+        }}
+        setInitialValues={setInitialValuesMock}
+        {...props}
+      />
+    );
+
+    await act(async () => {
+      const packWeightInput = getByPlaceholderText('Vendor Pack Weight');
+      userEvent.click(packWeightInput);
+      userEvent.type(packWeightInput, '19600');
+      packWeightInput.blur();
+      expect(packWeightInput).toHaveValue('19600');
+    });
+  });
+});

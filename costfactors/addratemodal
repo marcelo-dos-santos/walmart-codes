@@ -1,0 +1,734 @@
+import { useEffect, useState } from 'react';
+import { InputLabel, Select, MenuItem, Input } from '@mui/material';
+import { UploadButton } from './CustomApplyButton';
+import { Dialog, DialogContent } from '@mui/material';
+import { getEnv, getHeaders } from '../utils/EnvConfig';
+import { config } from '../utils/config';
+import axios from 'axios';
+import { getEnvironmentInfo } from '../environments/auth.service';
+
+interface AddRateModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAddRateSuccess: (newRate: {
+    rateValue: number;
+    effectiveDate: string;
+    expirationDate: string;
+    currency: string;
+    rateType: string;
+    rateBasis: string;
+  }) => void;
+  rateValue: number;
+  effectiveDate: string;
+  expirationDate: string;
+  currency: string;
+  rateType: string;
+  rateBasis: string;
+  ratesData: any[];
+  onAddRateClick: (rateData: {
+    rateValue: number;
+    effectiveDate: string;
+    expirationDate: string;
+    currency: string;
+    rateType: string;
+    rateBasis: string;
+  }) => void;
+  selectedValues: {
+    purchaseCompany: string;
+    expenseType: string;
+    expenseParameter: string;
+    transportMode: string;
+    containerType: string;
+    loadingPort: string;
+    destinationPort: string;
+    entryPort: string;
+    supplier9dvn: string;
+    agentOffice: string;
+    port: string;
+    destination: string;
+    department: string;
+    container: string;
+    country: string;
+    taxCategory: string;
+    importCountry: string;
+    originCountry: string;
+  };
+}
+
+interface Payload {
+  update_user_id: string;
+  market_id: number;
+  element_id: number;
+  element_subtype_id: number;
+  loading_port_id: number;
+  entry_port_id: number;
+  transport_mode: number;
+  container_type_id: number;
+  per_uom_code: string;
+  rateValue: number;
+  effectiveDate: string;
+  expirationDate: string;
+  currency: string;
+  rateType: string;
+  rateBasis: string;
+}
+
+const labelStyle = {
+  fontSize: '14px',
+  display: 'block',
+  marginBottom: '5px',
+  marginTop: '24px',
+  fontWeight: 700,
+  color: 'rgba(46, 47, 50, 1)',
+};
+
+const inputStyle = {
+  width: '268px',
+  height: '56px',
+  padding: '13px',
+  borderRadius: '4px',
+  border: '1px solid rgba(144, 145, 150, 1)',
+  backgroundColor: 'rgba(255, 255, 255, 1)',
+  '&:hover': {
+    borderColor: 'rgba(144, 145, 150, 1)',
+  },
+};
+
+const inputSelectStyle = {
+  width: '552px',
+  height: '56px',
+  borderRadius: '4px',
+  border: '1px solid rgba(144, 145, 150, 1)',
+  backgroundColor: 'rgba(255, 255, 255, 1)',
+  '&:hover': {
+    borderColor: 'rgba(144, 145, 150, 1)',
+  },
+};
+
+const textStyle = {
+  fontFamily: 'Bogle',
+  fontSize: '24px',
+  fontWeight: 700,
+  lineHeight: '36px',
+};
+
+const linkStyle = {
+  fontFamily: 'Bogle',
+  fontSize: '16px',
+  fontWeight: 400,
+  lineHeight: '24px',
+  textDecoration: 'underline',
+  color: 'rgba(46, 47, 50, 1)',
+  transition: 'filter 0.3s ease',
+  cursor: 'pointer',
+};
+
+const buttonStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  marginTop: '20px',
+  justifyContent: 'flex-end',
+  gap: '16px',
+};
+
+export function AddRateModal({
+  open,
+  onClose,
+  rateValue,
+  effectiveDate,
+  expirationDate,
+  currency,
+  rateType,
+  rateBasis,
+  ratesData,
+  selectedValues,
+  onAddRateSuccess,
+}: AddRateModalProps) {
+  const [showAddRateModal, setShowAddRateModal] = useState(false);
+  const [effective, setEffective] = useState('');
+  const [termination, setTermination] = useState('');
+  const [selectedCurrency, setSelectedCurrency] = useState(currency);
+  const [selectedRateType, setSelectedRateType] = useState('');
+  const [selectedRateValue, setSelectedRateValue] = useState(rateValue);
+  const [rateInputValue, setRateInputValue] = useState('');
+  const [selectedRateBasis, setSelectedRateBasis] = useState(rateBasis);
+  let env: {
+    headers: any;
+  };
+
+  useEffect(() => {
+    env = getEnv(config);
+  });
+
+  const environment = getEnvironmentInfo();
+
+  useEffect(() => {
+    console.log(showAddRateModal);
+  });
+
+  const convertDate = (dateString: string) => {
+    const parts = dateString
+      .split('-')
+      .map((part: string) => parseInt(part, 10));
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  };
+
+  const addOneDay = (date: string | number | Date) => {
+    const result = new Date(date);
+    result.setDate(result.getDate() + 1);
+    return result;
+  };
+
+  const handleEffectiveDateChange = (e: { target: { value: any } }) => {
+    const dateValue = e.target.value;
+    const matches = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (matches && matches[1] && matches[1].length === 4) {
+      setEffective(dateValue);
+    } else {
+      alert('Please fill the date in the correct format: mm/dd/yyyy');
+      setEffective('');
+    }
+  };
+
+  const handleTerminationDateChange = (e: { target: { value: any } }) => {
+    const dateValue = e.target.value;
+    const matches = dateValue.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (matches && matches[1] && matches[1].length === 4) {
+      setTermination(dateValue);
+    } else {
+      alert('Please fill the date in the correct format: mm/dd/yyyy');
+      setTermination('');
+    }
+  };
+
+  function transformSelectedValues(selectedValues: {
+    purchaseCompany: any;
+    expenseType: any;
+    expenseParameter: any;
+    transportMode: any;
+    containerType?: string;
+    loadingPort: any;
+    destinationPort: any;
+    entryPort: any;
+    supplier9dvn: any;
+    agentOffice: any;
+    port: any;
+    destination: any;
+    department: any;
+    container: any;
+    country: any;
+    taxCategory: any;
+    importCountry: any;
+    originCountry: any;
+  }) {
+    return {
+      market_id: Number(selectedValues.purchaseCompany),
+      element_id: Number(selectedValues.expenseType),
+      element_subtype_id: Number(selectedValues.expenseParameter),
+      loading_port_id: Number(selectedValues.loadingPort),
+      entry_port_id: Number(selectedValues.entryPort),
+      transport_mode: Number(selectedValues.transportMode),
+      container_type_id: Number(selectedValues.container),
+      destination_port_id: selectedValues.destinationPort,
+      supplier9dvn_id: selectedValues.supplier9dvn,
+      agent_office_id: selectedValues.agentOffice,
+      port_id: selectedValues.port,
+      destination_id: selectedValues.destination,
+      department_id: selectedValues.department,
+      container_id: selectedValues.container,
+      country_id: selectedValues.country,
+      tax_category_id: selectedValues.taxCategory,
+      import_country_id: selectedValues.importCountry,
+      origin_country_id: selectedValues.originCountry,
+    };
+  }
+
+  const rateData = {
+    rate_value: selectedRateValue,
+    effective_date: effective,
+    termination_date: termination,
+    currency_code: selectedCurrency,
+    rate_type: selectedRateType,
+    per_uom_code: selectedRateBasis,
+  };
+
+  const currentDate = new Date();
+  const formattedCurrentDate = `${currentDate.getFullYear()}-${String(
+    currentDate.getMonth() + 1
+  ).padStart(2, '0')}-${String(currentDate.getDate()).padStart(2, '0')}`;
+
+  const transformedValues = transformSelectedValues(selectedValues);
+
+  async function fetchRates() {
+    const effectiveDate = convertDate(effective);
+    const terminationDate = convertDate(termination);
+
+    const sortedRatesData = ratesData.sort((a, b) => {
+      return (
+        convertDate(b.termination_date).getTime() -
+        convertDate(a.termination_date).getTime()
+      );
+    });
+
+    const latestRate = sortedRatesData[0];
+
+    if (effectiveDate <= new Date()) {
+      console.error('Effective date should be greater than today.');
+      return;
+    }
+
+    if (terminationDate < effectiveDate) {
+      console.error(
+        'Termination date should be greater or equal than effective date.'
+      );
+      return;
+    }
+
+    if (latestRate && !latestRate.termination_date) {
+      console.error("There's an open previous record.");
+      return;
+    }
+
+    if (
+      latestRate &&
+      addOneDay(convertDate(latestRate.termination_date)).getTime() !==
+        effectiveDate.getTime()
+    ) {
+      console.error(
+        "New start date should be the next date of the previous record's termination date."
+      );
+      return;
+    }
+    const isOverlap = ratesData.some((data) => {
+      const rateEffectiveDate = new Date(data.effective_date);
+      const rateTerminationDate = new Date(data.termination_date);
+      return (
+        rateEffectiveDate <= terminationDate &&
+        rateTerminationDate >= effectiveDate
+      );
+    });
+    if (isOverlap) {
+      console.error('Can`t overlap date.');
+      return;
+    }
+    const valueNum = parseFloat(rateInputValue);
+    if (selectedRateType === 'Percentage' && (valueNum < 0 || valueNum > 100)) {
+      console.error('Percentage value should be between 0 and 100.');
+      return;
+    }
+
+    setSelectedRateValue(valueNum);
+
+    const payload: Partial<Payload> = {
+      ...rateData,
+      ...transformedValues,
+      update_user_id: 'mfromer',
+    };
+    Object.keys(payload).forEach((key) => {
+      if (payload[key as keyof Payload] === '')
+        delete payload[key as keyof Payload];
+    });
+
+    try {
+      const headers = getHeaders(env);
+      const response = await axios.post(
+        `${environment.gstCostApiBaseUrl}/ratemgmt/rates/ratelist`,
+        [payload],
+        {
+          headers,
+        }
+      );
+      if (response.status === 201) {
+        console.log('Rate added:', response.data);
+        setShowAddRateModal(false);
+        onClose();
+        onAddRateSuccess({
+          rateValue: selectedRateValue,
+          effectiveDate: effective,
+          expirationDate: termination,
+          currency: selectedCurrency,
+          rateType: selectedRateType,
+          rateBasis: selectedRateBasis,
+        });
+      } else if (response.status === 200) {
+        console.log('Rate added:', response.data);
+        setShowAddRateModal(false);
+        onClose();
+        onAddRateSuccess({
+          rateValue: selectedRateValue,
+          effectiveDate: effective,
+          expirationDate: termination,
+          currency: selectedCurrency,
+          rateType: selectedRateType,
+          rateBasis: selectedRateBasis,
+        });
+      }
+    } catch (error) {
+      console.log('Data:', payload);
+      console.error('Error trying to add/update rate:', error);
+    }
+  }
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth={false}>
+      <DialogContent>
+        <div className="addmodal">
+          <div className="modal-content">
+            <div
+              className="title"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                marginBottom: '-20px',
+              }}
+            >
+              <h2 style={textStyle}>Add Rate</h2>
+              <span
+                className="close-button"
+                style={{ fontSize: '24px', cursor: 'pointer' }}
+                onClick={onClose}
+              >
+                &times;
+              </span>
+            </div>
+            <div
+              className="date-inputs"
+              style={{ display: 'flex', gap: '16px', alignItems: 'center' }}
+            >
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <InputLabel style={labelStyle} htmlFor="effective-date">
+                  Effective date (mm/dd/yyyy)
+                </InputLabel>
+                <Input
+                  type="date"
+                  id="effective-date"
+                  aria-label="EffectiveDate"
+                  sx={inputStyle}
+                  onBlur={handleEffectiveDateChange}
+                  inputProps={{
+                    min: formattedCurrentDate,
+                    pattern: '\\d{4}-\\d{2}-\\d{2}',
+                  }}
+                  value={effective}
+                  onChange={(e) => setEffective(e.target.value)}
+                />
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <InputLabel style={labelStyle} htmlFor="expiration-date">
+                  Termination date (mm/dd/yyyy)
+                </InputLabel>
+                <Input
+                  type="date"
+                  id="expiration-date"
+                  aria-label="TerminationDate"
+                  sx={inputStyle}
+                  value={termination}
+                  onBlur={handleTerminationDateChange}
+                  inputProps={{
+                    min: formattedCurrentDate,
+                    pattern: '\\d{4}-\\d{2}-\\d{2}',
+                  }}
+                  onChange={(e) => setTermination(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="selects">
+              <InputLabel style={labelStyle} htmlFor="currency">
+                Currency
+              </InputLabel>
+              <Select
+                id="currency"
+                data-cy="currencySelect"
+                aria-label="Currency"
+                sx={inputSelectStyle}
+                value={selectedCurrency || ''}
+                onChange={(e) => setSelectedCurrency(e.target.value)}
+              >
+                <MenuItem value="USD">US Dollar</MenuItem>
+                <MenuItem value="MXP">Mexican Peso</MenuItem>
+              </Select>
+              <InputLabel style={labelStyle} htmlFor="ratetype">
+                Rate type
+              </InputLabel>
+              <Select
+                id="ratetype"
+                data-cy="ratetypeSelect"
+                aria-label="RateType"
+                sx={inputSelectStyle}
+                value={selectedRateType || ''}
+                onChange={(e) => setSelectedRateType(e.target.value)}
+              >
+                <MenuItem value="Amount">Amount</MenuItem>
+                <MenuItem value="Percentage">Percentage</MenuItem>
+              </Select>
+            </div>
+            <div className="rate">
+              <InputLabel style={labelStyle} htmlFor="rate">
+                Rate/Percent
+              </InputLabel>
+              <Input
+                type="text"
+                id="rate"
+                data-cy="rate-percentSelect"
+                aria-label="RatePercent"
+                sx={{ ...inputSelectStyle, padding: '16px' }}
+                value={rateInputValue}
+                onChange={(e) => {
+                  const valueStr = e.target.value;
+
+                  if (/^\d*\.?\d*$/.test(valueStr)) {
+                    setRateInputValue(valueStr);
+
+                    const valueNum = parseFloat(valueStr);
+                    if (!isNaN(valueNum)) {
+                      if (
+                        selectedRateType === 'Percentage' &&
+                        (valueNum < 0 || valueNum > 100)
+                      ) {
+                        window.alert(
+                          'Percentage value should be between 0 and 100.'
+                        );
+                        setRateInputValue('');
+                      } else {
+                        setSelectedRateValue(valueNum);
+                      }
+                    }
+                  } else {
+                    console.error('Please enter a valid number.');
+                    setRateInputValue('');
+                  }
+                }}
+              />
+            </div>
+            <div className="rate-basis">
+              <InputLabel style={labelStyle} htmlFor="rate-basis">
+                Unit of Measure
+              </InputLabel>
+              <Select
+                id="rate-basis"
+                data-cy="ratebasisSelect"
+                aria-label="RateBasis"
+                sx={inputSelectStyle}
+                value={selectedRateBasis || ''}
+                onChange={(e) => setSelectedRateBasis(e.target.value)}
+              >
+                <MenuItem value="CR">Cubic Meter</MenuItem>
+                <MenuItem value="Kilogram">Kilogram</MenuItem>
+              </Select>
+            </div>
+            <div className="buttons" style={buttonStyle}>
+              <a style={linkStyle} onClick={onClose}>
+                Cancel
+              </a>
+              <UploadButton data-cy="saveButton" onClick={fetchRates}>
+                Save
+              </UploadButton>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export default AddRateModal;
+
+import React from 'react';
+import { render, fireEvent, screen, waitFor } from '@testing-library/react';
+import AxiosMockAdapter from 'axios-mock-adapter';
+import axios from 'axios';
+import AddRateModal from '../AddRateModal';
+import selectEvent from 'react-select-event';
+import '@testing-library/jest-dom/extend-expect';
+import userEvent from '@testing-library/user-event';
+import { getEnvironmentInfo } from '../../environments/auth.service';
+
+const axiosMock = new AxiosMockAdapter(axios);
+
+const environment = getEnvironmentInfo();
+
+interface AddRateModalProps {
+  open: boolean;
+  onClose: () => void;
+  onAddRateSuccess: (newRate: {
+    rateValue: number;
+    effectiveDate: string;
+    expirationDate: string;
+    currency: string;
+    rateType: string;
+    rateBasis: string;
+  }) => void;
+  rateValue: number;
+  effectiveDate: string;
+  expirationDate: string;
+  currency: string;
+  rateType: string;
+  rateBasis: string;
+  ratesData: any[];
+  onAddRateClick: (rateData: {
+    rateValue: number;
+    effectiveDate: string;
+    expirationDate: string;
+    currency: string;
+    rateType: string;
+    rateBasis: string;
+  }) => void;
+  selectedValues: {
+    purchaseCompany: string;
+    expenseType: string;
+    expenseParameter: string;
+    transportMode: string;
+    containerType: string;
+    loadingPort: string;
+    destinationPort: string;
+    entryPort: string;
+    supplier9dvn: string;
+    agentOffice: string;
+    port: string;
+    destination: string;
+    department: string;
+    container: string;
+    country: string;
+    taxCategory: string;
+    importCountry: string;
+    originCountry: string;
+  };
+}
+
+jest.mock('../../utils/EnvConfig', () => ({
+  getEnv: jest.fn().mockReturnValue({ headers: {} }),
+  getHeaders: jest.fn().mockReturnValue({}),
+}));
+
+jest.mock('../../utils/config', () => ({}));
+
+const renderComponent = (props: AddRateModalProps) => {
+  return render(<AddRateModal {...props} />);
+};
+
+describe('AddRateModal', () => {
+  const mockOnClose = jest.fn();
+  const mockOnAddRateSuccess = jest.fn();
+  const props = {
+    open: true,
+    onClose: mockOnClose,
+    onAddRateSuccess: mockOnAddRateSuccess,
+    rateValue: 10,
+    effectiveDate: '2023-01-01',
+    expirationDate: '',
+    currency: 'US Dollar',
+    rateType: 'Amount',
+    rateBasis: 'Kilogram',
+    ratesData: [],
+    selectedValues: {
+      purchaseCompany: '',
+      expenseType: '',
+      expenseParameter: '',
+      transportMode: '',
+      containerType: '',
+      loadingPort: '',
+      destinationPort: '',
+      entryPort: '',
+      supplier9dvn: '',
+      agentOffice: '',
+      port: '',
+      destination: '',
+      department: '',
+      container: '',
+      country: '',
+      taxCategory: '',
+      importCountry: '',
+      originCountry: '',
+    },
+    onAddRateClick: jest.fn(),
+  };
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    axiosMock.reset();
+  });
+
+  it('renders correctly', () => {
+    const { getByText } = render(<AddRateModal {...props} />);
+    expect(getByText('Add Rate')).toBeInTheDocument();
+  });
+
+  test('Should open the modal when open is true', () => {
+    const { getByRole } = render(<AddRateModal {...props} />);
+    expect(getByRole('dialog')).toBeInTheDocument();
+  });
+
+  test('should call onclose when close button is clicked', () => {
+    const { getByText } = render(<AddRateModal {...props} />);
+    fireEvent.click(getByText('×'));
+    expect(mockOnClose).toHaveBeenCalled();
+  });
+
+  it('calls fetchRates when save button is clicked', async () => {
+    renderComponent(props);
+
+    axiosMock
+      .onPost(`${environment.gstCostApiBaseUrl}/ratemgmt/rates/ratelist`)
+      .reply(201, {});
+
+    const effectiveDateInput = screen.getByLabelText(
+      'Effective date (mm/dd/yyyy)'
+    ) as HTMLInputElement;
+    userEvent.click(effectiveDateInput);
+    fireEvent.change(effectiveDateInput, { target: { value: '2060-12-23' } });
+
+    const terminationDateInput = screen.getByLabelText(
+      'Termination date (mm/dd/yyyy)'
+    ) as HTMLInputElement;
+    userEvent.click(terminationDateInput);
+    fireEvent.change(terminationDateInput, { target: { value: '2061-12-22' } });
+
+    // const currencySelect = screen.getByTestId('currencySelect');
+    // userEvent.click(currencySelect);
+    // await selectEvent.select(currencySelect, 'USD');
+
+    const amountSelect = screen.getByTestId('ratetypeSelect');
+    userEvent.click(amountSelect);
+    selectEvent.select(amountSelect, 'Amount');
+
+    userEvent.type(screen.getByLabelText(/RatePercent/i), '10');
+
+    const ratebasisSelect = screen.getByTestId('ratebasisSelect');
+    userEvent.click(ratebasisSelect);
+    selectEvent.select(ratebasisSelect, 'Kilogram');
+
+    const saveButton = screen.getByTestId('saveButton');
+    fireEvent.click(saveButton);
+
+    await waitFor(() => {
+      expect(mockOnAddRateSuccess).toHaveBeenCalledWith({
+        rateValue: 10,
+        effectiveDate: '2060-12-23',
+        expirationDate: '2061-12-22',
+        currency: 'US Dollar',
+        rateType: '',
+        rateBasis: 'Kilogram',
+      });
+    });
+  });
+
+  it('updates on change', async () => {
+    renderComponent(props);
+
+    const effectiveDateInput = screen.getByLabelText(
+      'Effective date (mm/dd/yyyy)'
+    ) as HTMLInputElement;
+    userEvent.click(effectiveDateInput);
+    fireEvent.change(effectiveDateInput, { target: { value: '2023-12-22' } });
+
+    const terminationDateInput = screen.getByLabelText(
+      'Termination date (mm/dd/yyyy)'
+    ) as HTMLInputElement;
+    userEvent.click(terminationDateInput);
+    fireEvent.change(terminationDateInput, { target: { value: '2024-12-22' } });
+
+    expect(effectiveDateInput.value).toBe('2023-12-22');
+    expect(terminationDateInput.value).toBe('2024-12-22');
+  });
+});

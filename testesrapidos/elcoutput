@@ -1,0 +1,55 @@
+import React from 'react';
+import { Container, Divider } from '@mui/material';
+import CostAccordion from '../CostAccordion/CostAccordion';
+import { cost } from '../utils/reponseData';
+import { styled } from '@mui/material/styles';
+import CostFilterFormTitle from '../CostCalculator/CostFilterFormTitle';
+import LoadingForm from '../CostAccordion/LoadingForm';
+import { ItemDetails } from '../utils/formInterface';
+
+interface responseProps {
+  itemDetails: ItemDetails | any;
+  responseData: Array<cost>;
+  error: string;
+  requestData: any;
+}
+
+const StyledContainer = styled(Container)({
+  boxShadow: '0px -1px 2px rgba(0, 0, 0, 0.1)',
+  border: '1px solid lightGrey',
+  borderRadius: '8px',
+  paddingTop: '5px',
+  width: '554px',
+});
+
+const ElcOutput: React.FC<responseProps> = ({
+  responseData,
+  error,
+  requestData,
+  itemDetails,
+}: responseProps) => {
+  return (
+    <StyledContainer maxWidth="md">
+      <CostFilterFormTitle
+        as="h3"
+        size="medium"
+        weight={700}
+        style={{ margin: '20px 0' }}
+      >
+        Estimated DC Landed Cost
+      </CostFilterFormTitle>
+      <Divider sx={{ marginBottom: '25px' }}></Divider>
+      {error === '' && responseData.length > 0 ? (
+        <CostAccordion
+          costs={responseData}
+          requestDataJson={requestData}
+          itemDetails={itemDetails}
+        ></CostAccordion>
+      ) : (
+        <LoadingForm></LoadingForm>
+      )}
+    </StyledContainer>
+  );
+};
+
+export default ElcOutput;

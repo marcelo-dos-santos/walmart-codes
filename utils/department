@@ -1,0 +1,101 @@
+import React from 'react';
+import CostFilterFormTitle from '../CostCalculator/CostFilterFormTitle';
+import { colorRed, margin } from './constants';
+import Select from 'react-select';
+import { getSubObject } from './getSubObject';
+import { Options } from './formInterface';
+
+export interface DepartmentProps {
+  departmentOptions: Options[];
+  initialValues: {
+    market: Options;
+    supplier: Options;
+    department: Options;
+    costValue: string;
+  };
+  setInitialValues: any;
+  setFilter: any;
+  setRequestData: any;
+}
+
+const Department: React.FC<DepartmentProps> = ({
+  initialValues,
+  setFilter,
+  setInitialValues,
+  departmentOptions,
+  setRequestData,
+}: DepartmentProps) => {
+  return (
+    <>
+      {initialValues.supplier.value && +initialValues.supplier.value <= 2 && (
+        <div
+          style={{
+            flexDirection: 'column',
+            width: '46%',
+            margin: margin,
+            height: '76px',
+          }}
+        >
+          <label
+            style={{ fontSize: '12px', display: 'block', marginBottom: '5px' }}
+            htmlFor="department"
+          >
+            <CostFilterFormTitle as="h4" size="small" weight={700}>
+              Department<span style={{ color: colorRed }}>*</span>
+            </CostFilterFormTitle>
+          </label>
+          <Select
+            inputId="department"
+            placeholder="Select"
+            data-cy="department-select"
+            classNamePrefix="department"
+            options={departmentOptions}
+            value={
+              initialValues.department.label ? initialValues.department : null
+            }
+            onChange={(option) => {
+              setInitialValues((prev: any) => {
+                const { label = null, value = null } = option ?? {
+                  label: null,
+                  value: null,
+                };
+                return {
+                  ...prev,
+                  department: { label, value },
+                };
+              });
+              setFilter((prev: any) => {
+                return {
+                  ...getSubObject(prev, ['is_domestic', 'market_id']),
+                  ['department_id']: option?.value,
+                };
+              });
+              setRequestData((prev: any) => {
+                return {
+                  ...prev,
+                  ['Department Id']: option?.label,
+                };
+              });
+            }}
+            styles={{
+              control: (baseStyles) => ({
+                ...baseStyles,
+                fontSize: '14px',
+                border: '1px solid rgb(144, 145, 150)',
+                paddingLeft: '4px',
+                fontFamily: 'Bogle',
+              }),
+              menuList: (baseStyles) => ({
+                ...baseStyles,
+                fontSize: '14px',
+                fontFamily: 'Bogle',
+              }),
+            }}
+          />
+        </div>
+      )}
+    </>
+  );
+};
+
+export default Department;

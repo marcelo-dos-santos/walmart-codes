@@ -1,0 +1,21 @@
+import { ErrorMessage } from "@walmart-web/livingdesign-components";
+import React from "react";
+
+const Loadingform = () => {
+    return (
+        <div style={{ padding: '11px' }}>
+            <div style={{ padding: '24px' }}>
+                <ErrorMessage
+                    title="No estimated DC landed cost"
+                    // media={
+                    //     <img alt="" height="28px" src="/assets/img/[POS] Bill.svg" width="26px" />
+                    // }
+                >
+                    Please fill out the form on the left and submit to see the estimated DC landed cost.
+                </ErrorMessage>
+            </div>
+        </div>
+    )
+}
+
+export default Loadingform;

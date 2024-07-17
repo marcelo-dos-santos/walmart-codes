@@ -1,0 +1,123 @@
+export const headers_US = [
+    {label: 'Supplier Name', key: 'supplier_name'},
+    {label: 'Item Description', key: 'item_description'},
+    { label: '*Market ID', key: 'market_id' },
+    { label: '*Department ID', key: 'department_id' },
+    { label: '*Network ID', key: 'network_id' },
+    { label: 'IDC Handling Type', key: 'is_flow'},
+    { label: '*Agent Office ID', key: 'agent_office_id' },
+    { label: 'Supplier 9DVN.Supplier', key: 'supplier.supplier_9dvn' },
+    { label: 'Supplier DA.Supplier', key: 'supplier.supplier_da' },
+    { label: '*First Cost.Product', key: 'product.first_cost' },
+    { label: '*Duty Rate.Product', key: 'product.duty_rate' },
+    { label: '*Total Eaches.Pack', key: 'pack.total_eaches' },
+    { label: '*Length', key: 'length' },
+    { label: '*Width', key: 'width' },
+    { label: '*Height', key: 'height' },
+    { label: '*Volume UOM.Pack', key: 'pack.volume_uom' },
+    { label: '*Weight.Pack', key: 'pack.weight' },
+    { label: '*Weight UOM.Pack', key: 'pack.weight_uom' },
+    { label: '*Incoterm Code.Import Freight', key: 'import_freight.incoterm_code' },
+    { label: '*Transport Mode.Import Freight', key: 'import_freight.transport_mode' },
+    { label: '*Loading Port ID.Import Freight', key: 'import_freight.loading_port_id' },
+];
+
+export const headers_MX = [
+    {label: 'Supplier Name', key: 'supplier_name'},
+    {label: 'Item Description', key: 'item_description'},
+    { label: '*Market ID', key: 'market_id' },
+    { label: '*Department ID', key: 'department_id' },
+    { label: '*Agent Office ID', key: 'agent_office_id' },
+    { label: '*First Cost.Product', key: 'product.first_cost' },
+    { label: 'Retail Cost.Product', key: 'product.retail_cost' },
+    { label: '*Duty Rate.Product', key: 'product.duty_rate' },
+    { label: '*Tax Category ID.Product', key: 'product.tax_category_id' },
+    { label: '*Total Eaches.Pack', key: 'pack.total_eaches' },
+    { label: '*Length', key: 'length' },
+    { label: '*Width', key: 'width' },
+    { label: '*Height', key: 'height' },
+    { label: '*Volume UOM.Pack', key: 'pack.volume_uom' },
+    { label: '*Weight.Pack', key: 'pack.weight' },
+    { label: '*Weight UOM.Pack', key: 'pack.weight_uom' },
+    { label: '*Destination Port ID.Import Freight', key: 'import_freight.destination_port_id' },
+    { label: '*Loading Port ID.Import Freight', key: 'import_freight.loading_port_id' },
+    { label: '*Incoterm Code.Import Freight', key: 'import_freight.incoterm_code' },
+    { label: '*Container Type Id.Import Freight', key: 'import_freight.container_type_id' },
+    { label: '*Transport Mode.Import Freight', key: 'import_freight.transport_mode' },
+    { label: '*Entry Port ID.Import Freight', key: 'import_freight.entry_port_id' },
+    { label: '*Origin Country Code.Import Freight', key: 'import_freight.origin_country_code' },
+    { label: '*Import Country Code.Import Freight', key: 'import_freight.import_country_code' },
+
+];
+
+export const USDirectImportRequest = [
+    {
+        "supplier_name": "Sample Supplier",
+        "item_description": "Sample Item",
+        "market_id": "1001-WAL-MART INC.USA",
+        "department_id": "92-GROCERIES",
+        "network_id": "1-IDC-GDC(Temperature Control)",
+        "is_flow": "Storage",
+        "agent_office_id": "881-WGS SHENZHEN",
+        "estimated_on": "",
+        "length": "2",
+        "width": "1",
+        "height": "5",
+        "supplier": {
+            "supplier_9dvn": "201920-STUFFED PUFFS LLC(36175698)",
+            "supplier_da": "10",
+        },
+        "product": {
+            "first_cost": "10",
+            "duty_rate": "0.9",
+        },
+        "pack": {
+            "total_eaches": "1",
+            "volume": "1",
+            "volume_uom": "Meters",
+            "weight": "1",
+            "weight_uom": "KG"
+        },
+        "import_freight": {
+            "incoterm_code": "FOB",
+            "transport_mode": "1-OCEAN",
+            "loading_port_id": "101356-YANTIAN"
+        }
+    }];
+
+export const MXDirectImportRequest = [
+    {
+        "supplier_name": "Sample Supplier",
+        "item_description": "Sample Item",
+        "agent_office_id": "881-WGS SHENZHEN",
+        "product": {
+            "retail_cost": "10",
+            "duty_rate": "0.9",
+            "first_cost": "10",
+            "tax_category_id": "5-Calorico"
+        },
+        "department_id": "1-CANDY, TOBACCO, COOKIES",
+        "import_freight": {
+            "container_type_id": "10-40_FT_DRY",
+            "destination_port_id": "3093-MEXICO CITY",
+            "entry_port_id": "3117-MANZANILLO",
+            "incoterm_code": "FOB",
+            "loading_port_id": "203887-NINGBO",
+            "origin_country_code":"CN-CHINA",
+            "import_country_code":"MX-MEXICO",
+            "transport_mode": "1-OCEAN",
+        },
+        "market_id": "1003-CMA MEXICO-WBSV",
+        "estimated_on": "",
+        "length": "2",
+        "width": "1",
+        "height": "5",
+        "pack": {
+            "volume": "1",
+            "total_eaches": "1",
+            "volume_uom": "Meters",
+            "weight_uom": "KG",
+            "weight": "1"
+        }
+    }
+];

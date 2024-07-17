@@ -1,0 +1,24 @@
+import { IEnvConfig } from "./config";
+
+export const getEnv = ({ development, stage }: IEnvConfig) => {
+    const host = window.location.host.split(':')[0];
+    switch (host) {
+        case 'dev.walmart.com':
+            return development
+        case 'https://onesource.dev.walmart.com':
+            return development
+        case 'gst-cost-ui-nx.dev.walmart.com':
+            return development
+        case 'localhost':
+            return development
+        case 'gst-cost-ui-nx.stg.walmart.com':
+            return stage
+        case 'onesource.stg.walmart.com':
+            return stage
+        default: return development;
+    }
+}
+
+export const getHeaders = (env: {headers: any}) => {
+    return env?.headers;
+}

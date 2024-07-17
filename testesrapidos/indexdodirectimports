@@ -1,0 +1,96 @@
+import { styled } from '@mui/material/styles';
+import { Accordion, AccordionSummary } from '@mui/material';
+import { cost } from '../utils/reponseData';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
+
+interface RequestDataJsonType {
+  [key: string]: string | number;
+}
+
+interface ResponseData {
+  [key: string]: string | number;
+}
+
+interface RequestData {
+  'Product ID'?: string | number;
+  'Product Desc'?: string | number;
+}
+
+export const CustomAccordion = styled(Accordion)({
+  borderRadius: '8px',
+  boxShadow: '0px -1px 2px rgba(0, 0, 0, 0.1)',
+  border: '1px solid lightGrey',
+  borderTopLeftRadius: '8px !important',
+  borderTopRightRadius: '8px !important',
+});
+
+export const CustomAccordionSummary = styled(AccordionSummary)({
+  height: '56px',
+});
+
+export const convertToTitleCase = (ele: string) => {
+  return ele?.replace(/^_*(.)|_+(.)/g, (s, c, d) =>
+    c ? c.toUpperCase() : ' ' + d.toUpperCase()
+  );
+};
+
+export const convertKey = (ele: string) => {
+  return ele
+    ?.split(' ')
+    .map((x) => x.toLowerCase())
+    .join('_');
+};
+
+export const validateInput = (
+  value: string,
+  numRegex: string | RegExp,
+  mandatory: boolean
+) => {
+  if (value !== '') {
+    const regex = new RegExp(numRegex);
+    return regex.test(value);
+  } else if (value === '' && mandatory === true) {
+    return false;
+  } else {
+    return true;
+  }
+};
+
+export const downloadExcel = (
+  requestDataJson: RequestDataJsonType,
+  costs: Array<cost>,
+  itemDetails: any
+) => {
+  const responseData: ResponseData = {};
+  let requestData: RequestData = {};
+  requestData['Product ID'] = itemDetails ? itemDetails?.itemId : "" ;
+  requestData['Product Desc'] = itemDetails ? itemDetails?.description : "";
+
+  requestData = { ...requestData, ...requestDataJson };
+
+  costs.forEach((cost) => {
+    if (cost.cost_elements && cost.cost_elements.length > 0) {
+      cost.cost_elements.forEach((ele) => {
+        if (ele.cost_elements && ele.cost_elements.length > 0) {
+          ele.cost_elements.forEach((subEle) => {
+            responseData[subEle.description] = subEle.amount;
+          });
+        }
+        responseData[ele.description] = ele.amount;
+      });
+    }
+    responseData[cost.description] = cost.value;
+  });
+
+  const jsonData = { ...requestData, ...responseData };
+  const wb = XLSX.utils.book_new();
+  const ws = XLSX.utils.json_to_sheet([jsonData]);
+  XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([excelBuffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8',
+  });
+  saveAs(blob, 'LandedCost.xlsx');
+};

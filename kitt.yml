@@ -1,0 +1,276 @@
+setup:
+  releaseRefs: ["main", "test-sonar.*"]
+  featureFlagMap:
+    buildWhenStageRefMatches: false
+    enableIstioSidecar: false
+    isGoldenSignalGateEnabled: true
+
+profiles:
+  - node
+  - "git://Tunr:strati-af-ccm2-assets:master:ccm2v2"
+
+owner:
+  group: MSO-OneTrack-Dev
+
+notify:
+  slack:
+    channelName: "onesource-builds-ui"
+
+alerts:
+  slack: "onesource-builds-ui"
+
+build:
+  looper:
+    enableDockerNoCache: false
+    enableDockerClean: false
+  docker:
+    app:
+      dockerFile: ./Dockerfile
+      buildArgs:
+        currentStage: "dev"
+        nodeVersion: 14.21
+        nodeImage: -alpine3.16
+        sonarSourceDir: .
+        sonarProjKey: one-source
+        sonarEnable: 'true'
+        sonarOpts: '-Dsonar.sources=.
+          -Dsonar.inclusions=**/*.ts,**/*.tsx,**/*.js,**/*.jsx
+          -Dsonar.tests=.
+          -Dsonar.test.inclusions=**/*.test.ts,**/*.test.tsx,**/*.test.js,**/*.test.jsx,**/*.spec.ts,**/*.spec.tsx,**/*.spec.js,**/*.spec.jsx
+          -Dsonar.projectVersion={{ $.kitt.build.version }}
+          -Dsonar.exclusions=**/exampleService.js,**/example/**
+          -Dsonar.javascript.file.suffixes=.js,.jsx
+          -Dsonar.typescript.file.suffixes=.ts,.tsx
+          -Dsonar.javascript.lcov.reportPaths=reports/coverage/lcov.info'
+
+deploy:
+  namespace: onesource
+  helm:
+    values:
+      volumeMounts:
+              config-vol:
+                mountPath: "/usr/share/nginx/html/apps/one-source/etc/config"
+      metadata:
+        labels:
+          ccm.serviceId: "OneSource"
+          ccm.serviceConfigVersion: "NON-PROD-1.0"
+          ccm.envProfile: "{{$.kittExec.currentCluster.profile}}"
+          ccm.envName: "{{$.kittExec.currentStage.name}}"
+          ccm.region: "{{$.kittExec.currentCluster.site}}"
+          ccm.country: "{{$.kittExec.currentCluster.country}}"
+          ccm.cluster: "{{$.kittExec.currentCluster.clusterId}}"
+          ccm.namespace: "{{$.kitt.deploy.namespace}}"
+          ccm.deploymentContext: "{{$.kittExec.currentStage.name}}"
+          ccm.clusterprovider: "{{$.kittExec.currentCluster.provider}}"
+          ccm.node: node
+          ccm.zone: "{{$.kittExec.currentCluster.site}}"
+      env:
+       NODE_ENV: "{{$.kittExec.currentStage.name}}"
+      min:
+        cpu: 256m
+        memory: 256Mi
+      max:
+        cpu: 512m
+        memory: 512Mi
+      livenessProbe:
+        enabled: true
+        probeInterval: 30
+        wait: 180
+        path: "/favion.ico"
+        failureThreshold: 5
+      readinessProbe:
+        enabled: true
+        wait: 180
+        path: "/favicon.ico"
+      networking:
+        externalPort: '8080'
+        internalPort: '8080'
+        ports:
+          http:
+            externalPort: 8080
+            internalPort: 8080
+            protocol: TCP
+        metrics-port:
+            internalPort: 7766 #<POM port>
+            externalPort: 7766 #<POM port>
+            protocol: TCP
+      global:
+        metrics:
+          enabled: true
+          goldenSignalsAggregation: true
+          remoteWriteSampleLimit: 100
+          whitelistenabled: true
+          endpoints:
+            - targetPort: 7766 #<POM port>
+              path: "/metrics" #<POM url path>
+          whitelist:
+            - processTime_seconds_sum:rate2m
+            - processTime_seconds_count:rate2m
+            - c4XX_total:rate2m
+            - c5XX_total:rate2m
+            - processTime_seconds_min:min
+            - processTime_seconds_max:max
+            - processTime_seconds:avg
+  releaseType:
+    deployTimeout: 300
+    rollbackOnError: false
+  changeRecord:
+    type: auto
+    group: 'AD - Merch - Sourcing Dev'
+    managerGroup: 'Change Managers - GEC'
+    affectedGEOs: ['US']
+    businessUnits: ['Global Sourcing']
+    notify:
+      slack:
+        channelName: ['onesource_change_log']
+  approvers:
+    groups: 'GblSrc-Svr-Admin'
+  gslb:
+    lbRoutings:
+      dev:
+        cnames: [onesource-host.dev.walmart.com]
+      stage:
+        cnames: [onesource-host.stg.walmart.com]
+      prod:
+        cnames: [onesource-host.walmart.com]
+
+  stages:
+    - name: pr
+      refEventFilters:
+        - refs: ["main", "test-sonar.*"]
+          events: [onPROpen, onPRReopen, onPRSync]
+      target:
+        cluster_id: ["uswest-dev-az-002"]
+      helm:
+        values:
+          metadata:
+            labels:
+              ccm.envProfile: "dev"
+              ccm.envName: "dev"
+              ccm.deploymentContext: "dev"
+          context:
+            environment: dev
+            environmentProfile: dev
+          env:
+            NODE_ENV: remoteDev
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: "Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}."
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Deleting temp namespace ..."
+#         - task:
+#             name: deleteNs
+#             enabled: true
+#             executionScope: stage
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: |
+              Deleted PR's temporary namespace*:
+              > Name: {{ $.kitt.deploy.namespace }}
+              > Cluster: {{$.kittExec.currentCluster.clusterId}}
+
+    - name: dev
+      refs: ["main"]
+      target:
+        cluster_id: [ "uswest-dev-az-002" ]
+      helm:
+        values:
+          context:
+            environment: dev
+            environmentProfile: dev
+          env:
+            NODE_ENV: remoteDev
+            NX_NODE_ENV: dev
+          metadata:
+            labels:
+              ccm.serviceId: "OneSource"
+              ccm.serviceConfigVersion: "NON-PROD-1.0"
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: "Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}."
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true
+    - name: stage
+      refs: ["main"]
+      target:
+        cluster_id: [ "uswest-stage-az-303" ]
+      helm:
+        values:
+          context:
+            environment: stage
+            environmentProfile: stage
+          env:
+            NODE_ENV: 'staging'
+            NX_NODE_ENV: staging
+          metadata:
+            labels:
+              ccm.serviceId: "OneSource"
+              ccm.serviceConfigVersion: "NON-PROD-1.0"
+      approvers:
+        groups:
+          - 'MSO-OneTrack-Dev'
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: "Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}."
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true
+    - name: prod
+      refs: ["main"]
+      target:
+        cluster_id: [ "scus-prod-a66", "uswest-prod-az-023"]
+      helm:
+        values:
+          context:
+            environment: production
+            environmentProfile: PRODUCTION
+          env:
+            NODE_ENV: 'production'
+          metadata:
+            labels:
+              ccm.serviceId: "OneSource"
+              ccm.serviceConfigVersion: "PROD-1.0"
+              wm.app: ONESOURCE
+              wm.env: prod
+      approvers:
+        groups:
+          - 'GblSrc-Svr-Admin'
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: "Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}."
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true;

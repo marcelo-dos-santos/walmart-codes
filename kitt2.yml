@@ -1,0 +1,394 @@
+#Setup
+setup:
+  releaseRefs: ["main"]
+  featureFlagMap:
+    usePluginRoutingManifests: true
+    useFullLooperContent: true
+    useArtifactory: true
+
+#Profiles
+profiles:
+  - electrode-webapp
+  - "git://Tunr:strati-af-ccm2-assets:master:ccm2v2"
+  - "git://Intl-Architecture-Developer-Tools:stage-gates:master:stage-gates"
+
+#Ownership
+owner:
+  group: RetailSourcing-TechMod
+
+#Notification
+notify:
+  slack:
+    channelName: gst-cost-build-alerts
+
+#build configuration
+build:
+  looper:
+    enableDockerNoCache: false
+    enableDockerClean: false
+  docker:
+    app:
+      buildArgs:
+        appArtifactVersion: "{{ $.kitt.build.version }}"
+        nodeVersion: "16.18.0"
+        nodeImage: -alpine3.16
+        sonarProjKey: "cost-management-ui"
+        sonarSourceDir: "src lib test coverage sonar-project.properties tsconfig.json package.json"
+        sonarSkipDir: "dist"
+        sonarEnable: "true"
+        sonarOpts: "-Dsonar.sources=.
+          -Dsonar.tests.inclusions=**/*/__tests__,**/*/*.spec.*,**/*/*.test.*
+          -Dsonar.projectVersion={{ $.kitt.build.version }}
+          -Dsonar.exclusions=**/*.html,config/**,archetype/**,node_modules/**,dist/**,lib/**,coverage/**,**/*.md,**/*/__tests__/**,**/locales/*/messages.js,**/*/__mocks__/**,**/*.test.*,**/*server.tsx,**/*subapp-manifest.js,**/*wml-tokens.js,**/*template.js,**/*server/plugins/*.(ts|js),**/server/**,**/utils/**,**/gst-*,**/hooks/**,**/client/**/*.js,**/client/common-root-components/**
+          -Dsonar.javascript.file.suffixes=.js,.jsx
+          -Dsonar.typescript.file.suffixes=.ts,.tsx
+          -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+          -Dsonar.typescript.lcov.reportPaths=coverage/lcov.info"
+    tests:
+      dockerFile: automation/Dockerfile
+      contextDir: ./
+  prebuild:
+    - task:
+        name: commentPr
+        comment: "The PR build started. <br>
+          [ Looper]({{$.kitt.build.looper.baseUrl}}/job/{{$.kitt.build.looper.baseFolder}}/job/{{$.kitt.build.looper.jobName}}/job/{{$.kitt.build.commitEvent.currentBranch}}) |
+          [ Concord ](https://concord.prod.walmart.com/#/process/${txId}) |
+          [ Visualize ](https://console.dx.walmart.com/pipelinevisualizer/flow/${txId})"
+        enabled: true
+    - task:
+        name: messageSlack
+        text: "Build started by <@${initiator.username}>"
+        enabled: true
+
+  postBuild:
+    - concord:
+        name: SonarQube Validator
+        enabled: true
+        arguments:
+          config:
+            sonarCheck:
+              projectKey: cost-management-ui
+              threshold: 80
+              mode: Passive
+
+#deploy configuration
+deploy:
+  namespace: gst-cost-calculator
+  releaseType:
+    strategy: normal
+    rollbackOnError: false #whether you want rollbacks to automatically occur
+    waitForReady: true
+    deployTimeout: 1200
+
+  #GSLBs
+  gslb:
+    lbRoutings:
+      dev:
+        cname: "{{$.kitt.build.artifact}}.dev.walmart.com"
+      stage:
+        cname: "{{$.kitt.build.artifact}}.stage.walmart.com"
+      prod:
+        cname: "{{$.kitt.build.artifact}}.walmart.com"
+
+  #Global Helm Configuration
+  helm:
+    values:
+      networking:
+        externalPort: "8080"
+        internalPort: "3000"
+        ports:
+          http:
+            externalPort: "8080"
+            internalPort: "3000"
+            protocol: TCP
+      readinessProbe:
+        path: "/ecv-status"
+      min:
+        cpu: 512m
+        memory: 512Mi
+      max:
+        cpu: 1024m
+        memory: 1024Mi
+      global:
+        metrics:
+          enabled: true
+          remoteWriteSampleLimit: 250
+          whitelist:
+            - processTime_seconds_count
+            - processTime_seconds_sum
+            - processTime_seconds
+            - c5XX_total
+            - c4XX_total
+
+  stages:
+    #pr-flow
+    - name: pr
+      refEventFilters:
+        - refs: ["main"]
+          events: [onPROpen, onPRReopen, onPRSync]
+      target:
+        cluster_id: [uswest-dev-az-001]
+      helm:
+        values:
+          context:
+            environment: dev
+            environmentProfile: dev
+          env:
+            NODE_ENV: remoteDev
+          metadata:
+            labels:
+              ccm.serviceId: GST-COST-UI
+              ccm.serviceConfigVersion: NON-PROD-1.0
+              wm.app: COST-MANAGEMENT-UI
+              wm.env: dev
+              strati.env: dev
+              deployment.environment: dev
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}.
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Starting functional tests on PR..."
+        - job:
+            action: create
+            executionScope: stage
+            name: "{{ $.kitt.build.artifact }}-tests"
+            timeoutSeconds: 1800  # Setting the timeout to 30 minutes
+            async: false
+            requestsCpu: 1
+            requestsMemory: 1G
+            limitsCpu: 2
+            limitsMemory: 2G
+            backoffLimit: 6
+            pollPeriodSeconds: 20
+            fetchJobLogsAfterPolling: true
+            namespace: "{{ $.kitt.deploy.namespace }}"
+            namePrefix: "{{ $.kitt.build.artifact }}-tests"
+            image: "docker.ci.artifacts.walmart.com/retail-sourcing-ngp-docker/gst-costmanagement-ui-tests:{{$.kitt.build.version}}"
+            secrets:
+              akeyless: true
+              file_refresh: false
+              config:
+                akeyless:
+                  path: /Prod/WCNP/homeoffice/RetailSourcing-TechMod/gst-cost-management-ui/ima
+              files:
+                - destination: cypress.env.json
+                  content: cypress.env
+                - destination: TestBurstKey.properties
+                  content: TestBurstKey
+            env:
+              stage: "{{ $.kittExec.currentStage.name }}"
+              runID: ${txId}
+              app_url: "http://{{$.kittExec.clusterAppEndpoint}}"
+              COMMIT_ID: "{{ $.kitt.build.version }}"
+              appname: "{{ $.kitt.build.looper.jobName }}"
+              slackChannel: "{{$.kitt.notify.slack.channelName}}"
+              slackThread: "{{$.kitt.notify.slack.threadTS}}"
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Functional tests COMPLETED > https://testburst.walmart.com/getData?testid1=${txId} "
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Deleting temp namespace ..."
+        - task:
+            name: deleteNs
+            enabled: true
+            executionScope: stage
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: |
+              Deleted PR's temporary namespace*:
+              > Name: {{ $.kitt.deploy.namespace }}
+              > Cluster: {{$.kittExec.currentCluster.clusterId}}
+
+      #dev env
+    - name: dev
+      refs: ["main"]
+      target:
+        cluster_id: [uswest-dev-az-001]
+      helm:
+        values:
+          context:
+            environment: dev
+            environmentProfile: dev
+          env:
+            NODE_ENV: remoteDev
+          metadata:
+            labels:
+              ccm.serviceId: GST-COST-UI
+              ccm.serviceConfigVersion: NON-PROD-1.0
+              wm.app: COST-MANAGEMENT-UI
+              wm.env: dev
+              strati.env: dev
+      postDeploy:
+        - task:
+            name: messageSlack
+            text: "Build has been deployed to {{$.kittExec.currentStage.name}} at {{$.kittExec.currentCluster.hosts}}."
+        - task:
+            name: commentPr
+            comment: ":green_circle: &nbsp;The PR is deployed successfully. <br>
+              **Environment:** {{$.kittExec.currentStage.name}} <br>
+              **Namespace:** [{{$.kitt.deploy.namespace}}](https://console.dx.walmart.com/wcnp/namespaces/{{$.kitt.deploy.namespace}}) <br>
+              **Deployed URL:** https://{{$.kittExec.clusterAppEndpoint}} <br>
+              **Kubernetes Dashboard:** https://k8s-dashboard.kube-system.{{$.kittExec.currentCluster.clusterId}}.cluster.k8s.us.walmart.net/#/overview?namespace={{$.kitt.deploy.namespace}}"
+            enabled: true
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Starting functional tests on Dev..."
+        - job:
+            action: create
+            executionScope: stage
+            name: "{{ $.kitt.build.artifact }}-tests"
+            timeoutSeconds: 1800  # Setting the timeout to 30 minutes
+            async: false
+            requestsCpu: 1
+            requestsMemory: 1G
+            limitsCpu: 2
+            limitsMemory: 2G
+            backoffLimit: 6
+            pollPeriodSeconds: 20
+            fetchJobLogsAfterPolling: true
+            namespace: "{{ $.kitt.deploy.namespace }}"
+            namePrefix: "{{ $.kitt.build.artifact }}-tests"
+            image: "docker.ci.artifacts.walmart.com/retail-sourcing-ngp-docker/gst-costmanagement-ui-tests:{{$.kitt.build.version}}"
+            secrets:
+              akeyless: true
+              file_refresh: false
+              config:
+                akeyless:
+                  path: /Prod/WCNP/homeoffice/RetailSourcing-TechMod/gst-cost-management-ui/ima
+              files:
+                - destination: cypress.env.json
+                  content: cypress.env
+                - destination: TestBurstKey.properties
+                  content: TestBurstKey
+            env:
+              stage: "{{ $.kittExec.currentStage.name }}"
+              runID: ${txId}
+              app_url: "http://{{$.kittExec.clusterAppEndpoint}}"
+              COMMIT_ID: "{{ $.kitt.build.version }}"
+              appname: "{{ $.kitt.build.looper.jobName }}"
+              slackChannel: "{{$.kitt.notify.slack.channelName}}"
+              slackThread: "{{$.kitt.notify.slack.threadTS}}"
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Functional tests COMPLETED > https://testburst.walmart.com/getData?testid1=${txId} "
+
+      #stage env
+    - name: stage
+      refs: ["main"]
+      target:
+        cluster_id: [uswest-stage-wmt-001]
+      helm:
+        values:
+          scaling:
+            min: 1
+            max: 2
+          context:
+            environment: stage
+            environmentProfile: stage
+          env:
+            NODE_ENV: staging
+            WM_CONSUMER_ID: 8b22ca72-e65f-4a9a-b7a5-9a19c1a93add
+            WM_SVC_ENV: stg
+            WM_SVC_NAME: GST-COST-SERVICE
+          metadata:
+            labels:
+              ccm.serviceId: GST-COST-UI
+              ccm.serviceConfigVersion: NON-PROD-1.0
+              wm.app: COST-MANAGEMENT-UI
+              wm.env: stg
+              strati.env: stg
+      postDeploy:
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Starting functional tests on Stage..."
+        - job:
+            action: create
+            executionScope: stage
+            name: "{{ $.kitt.build.artifact }}-tests"
+            timeoutSeconds: 1800  # Setting the timeout to 30 minutes
+            async: false
+            requestsCpu: 1
+            requestsMemory: 1G
+            limitsCpu: 2
+            limitsMemory: 2G
+            backoffLimit: 6
+            pollPeriodSeconds: 20
+            fetchJobLogsAfterPolling: true
+            namespace: "{{ $.kitt.deploy.namespace }}"
+            namePrefix: "{{ $.kitt.build.artifact }}-tests"
+            image: "docker.ci.artifacts.walmart.com/retail-sourcing-ngp-docker/gst-costmanagement-ui-tests:{{$.kitt.build.version}}"
+            secrets:
+              akeyless: true
+              file_refresh: false
+              config:
+                akeyless:
+                  path: /Prod/WCNP/homeoffice/RetailSourcing-TechMod/gst-cost-management-ui/ima
+              files:
+                - destination: cypress.env.json
+                  content: cypress.env
+                - destination: TestBurstKey.properties
+                  content: TestBurstKey  
+            env:
+              stage: "{{ $.kittExec.currentStage.name }}"
+              runID: ${txId}
+              app_url: "http://{{$.kittExec.clusterAppEndpoint}}"
+              COMMIT_ID: "{{ $.kitt.build.version }}"
+              appname: "{{ $.kitt.build.looper.jobName }}"
+              slackChannel: "{{$.kitt.notify.slack.channelName}}"
+              slackThread: "{{$.kitt.notify.slack.threadTS}}"
+        - task:
+            name: messageSlack
+            enabled: true
+            executionScope: stage
+            text: "Functional tests COMPLETED > https://testburst.walmart.com/getData?testid1=${txId} "
+
+      #stage prod
+    - name: prod
+      refs: ["main"]
+      target:
+        cluster_id: [uswest-prod-wmt-001, useast-prod-wmt-001]
+      helm:
+        values:
+          scaling:
+            min: 1
+            max: 2
+          context:
+            environment: prod
+            environmentProfile: prod
+          env:
+            NODE_ENV: prod
+            WM_CONSUMER_ID: 3d2ab850-e103-4451-a958-b9cdc0356e9c
+            WM_SVC_ENV: prod
+            WM_SVC_NAME: GST-COST-SERVICE
+          metadata:
+            labels:
+              ccm.serviceId: GST-COST-UI
+              ccm.serviceConfigVersion: PROD-1.0
+              wm.app: COST-MANAGEMENT-UI
+              wm.env: prod
+              strati.env: prod
